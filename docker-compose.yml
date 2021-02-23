@@ -1,0 +1,64 @@
+version: '3.7'
+services:
+  mysql_db_container:
+    image: mysql:latest
+    command: --default-authentication-plugin=mysql_native_password
+    secrets:
+      - mysql_historian_root-password
+    environment:
+      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_historian_root-password
+    ports:
+      - target: 3306
+        published: 3666
+        protocol: tcp
+        mode: host
+      - target: 33060
+        published: 36660
+        protocol: tcp
+        mode: host
+    volumes:
+      - historian_data:/var/lib/mysql
+      - /etc/ssl/:/etc/mysql/certs/
+    networks:
+      - factory-plus
+
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == amrc-factoryP-h
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+  mysqld_exporter:
+    image: prom/mysqld-exporter:latest
+    user: root
+    entrypoint:
+        - mysqld_exporter
+        - --config.my-cnf=/run/secrets/mysql_historian_exporter-password
+    secrets:
+      - mysql_historian_exporter-password
+    deploy:
+      labels:
+        - "prometheus-job=mysql-historian"
+        - "prometheus-port=9104"
+      placement:
+        constraints:
+          - node.hostname == amrc-factoryP-h
+    networks:
+      - factory-plus
+    depends_on:
+      - mysql_db_container
+secrets:
+  mysql_historian_root-password:
+    external: true
+  mysql_historian_exporter-password:
+    external: true
+
+volumes:
+  historian_data:
+
+networks:
+  factory-plus:
+    external: true
+    name: factory-plus

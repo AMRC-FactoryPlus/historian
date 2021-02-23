@@ -1,0 +1,5 @@
+[mysqld]
+binlog_do_db            = mqtt_auth
+gtid_mode=on
+enforce-gtid-consistency=ON
+
