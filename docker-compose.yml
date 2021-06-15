@@ -1,27 +1,20 @@
 version: '3.7'
 services:
-  mysql_db_container:
-    image: mysql:latest
-    command: --default-authentication-plugin=mysql_native_password
+  db:
+    image: timescale/timescaledb:2.3.0-pg12
     secrets:
-      - mysql_historian_root-password
+      - timescale_historian_root_password
     environment:
-      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_historian_root-password
+      - POSTGRES_PASSWORD_FILE=/run/secrets/timescale_historian_root_password
     ports:
-      - target: 3306
-        published: 3666
-        protocol: tcp
-        mode: host
-      - target: 33060
-        published: 36660
+      - target: 5432
+        published: 5432
         protocol: tcp
         mode: host
     volumes:
-      - historian_data:/var/lib/mysql
-      - /etc/ssl/:/etc/mysql/certs/
+      - data:/var/lib/postgresql/data
     networks:
       - factory-plus
-
     deploy:
       placement:
         constraints:
@@ -30,33 +23,34 @@ services:
         condition: on-failure
         delay: 5s
 
-  mysqld_exporter:
-    image: prom/mysqld-exporter:latest
-    user: root
-    entrypoint:
-        - mysqld_exporter
-        - --config.my-cnf=/run/secrets/mysql_historian_exporter-password
+  postgres_exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter
+    command: --auto-discover-databases
+    environment:
+      - DATA_SOURCE_URI=db?sslmode=disable
+      - DATA_SOURCE_USER=postgres_exporter
+      - DATA_SOURCE_PASS_FILE=/run/secrets/timescale_historian_exporter_password
     secrets:
-      - mysql_historian_exporter-password
+       - timescale_historian_exporter_password
     deploy:
       labels:
-        - "prometheus-job=mysql-historian"
-        - "prometheus-port=9104"
+        - "prometheus-job=timescale-historian"
+        - "prometheus-port=9187"
       placement:
         constraints:
           - node.hostname == amrc-factoryP-h
     networks:
-      - factory-plus
+       - factory-plus
     depends_on:
-      - mysql_db_container
+      - db
 secrets:
-  mysql_historian_root-password:
+  timescale_historian_root_password:
     external: true
-  mysql_historian_exporter-password:
+  timescale_historian_exporter_password:
     external: true
 
 volumes:
-  historian_data:
+  data:
 
 networks:
   factory-plus:
